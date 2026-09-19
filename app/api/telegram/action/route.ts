@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin, type EventConfig, type EvaluationStatus } from "@/lib/supabase";
-import { updateGuestStatus } from "@/lib/luma";
+import { approveGuest, waitlistGuest, type LumaMode } from "@/lib/luma-client";
 import {
   acquireDecisionLock,
   claimTelegramUpdate,
@@ -131,12 +131,10 @@ async function decide(
 
   // Execute the Luma call first; a failure keeps the card live so the human can retry.
   let lumaError: string | null = null;
+  let lumaMode: LumaMode | null = null;
   try {
-    await updateGuestStatus({
-      eventId: pending.lumaEventId,
-      guestId: pending.lumaGuestId,
-      status: approve ? "approved" : "waitlist",
-    });
+    const guest = { eventId: pending.lumaEventId, guestId: pending.lumaGuestId };
+    lumaMode = (approve ? await approveGuest(guest) : await waitlistGuest(guest)).mode;
   } catch (err) {
     lumaError = err instanceof Error ? err.message : String(err);
   }
@@ -149,6 +147,7 @@ async function decide(
     newStatus: lumaError ? previousStatus : newStatus,
     luma: lumaError ? "error" : "ok",
     lumaError,
+    lumaMode,
   });
 
   if (lumaError) {
@@ -163,6 +162,7 @@ async function decide(
       decided_by: actor.role,
       decided_at: new Date().toISOString(),
       luma_sync_error: null,
+      luma_sync_mode: lumaMode,
     })
     .eq("id", pending.evaluationId);
   if (error) console.error("evaluation update failed after Luma success", error);
@@ -243,6 +243,7 @@ async function audit(params: {
   newStatus: EvaluationStatus;
   luma: "ok" | "error" | "not_applicable";
   lumaError: string | null;
+  lumaMode?: LumaMode | null;
 }) {
   const { error } = await supabaseAdmin().from("host_audit_logs").insert({
     evaluation_id: params.pending.evaluationId,
@@ -255,7 +256,7 @@ async function audit(params: {
     luma_result: params.luma,
     luma_error: params.lumaError,
     telegram_message_id: params.pending.card?.messageId ?? null,
-    metadata: { job_id: params.pending.jobId, ai_score: params.pending.score },
+    metadata: { job_id: params.pending.jobId, ai_score: params.pending.score, luma_mode: params.lumaMode ?? null },
   });
   // The Luma call already happened; never lose the action because the log write failed.
   if (error) console.error("AUDIT WRITE FAILED", error, params);

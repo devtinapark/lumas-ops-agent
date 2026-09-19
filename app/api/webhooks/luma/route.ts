@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, type EventConfig, type EvaluationStatus } from "@/lib/supabase";
-import { parseGuestRegistered, updateGuestStatus, verifyLumaSignature, type ParsedRegistration } from "@/lib/luma";
+import { parseGuestRegistered, verifyLumaSignature, type ParsedRegistration } from "@/lib/luma";
+import { approveGuest, waitlistGuest, type LumaMode } from "@/lib/luma-client";
 import { scoreApplicant, type AttendeeScore } from "@/lib/scoring";
 import { claimWebhook, createJob, pauseForHost, releaseWebhook, updateJob, updatePending } from "@/lib/redis";
 import { sendApprovalCard } from "@/lib/telegram";
@@ -73,18 +74,16 @@ export async function POST(request: Request) {
     // 4. Route.
     if (route === "auto_approve" || route === "auto_waitlist") {
       const approve = route === "auto_approve";
-      await updateGuestStatus({
-        eventId: reg.lumaEventId,
-        guestId: reg.lumaGuestId,
-        status: approve ? "approved" : "waitlist",
-      });
+      const guest = { eventId: reg.lumaEventId, guestId: reg.lumaGuestId };
+      const luma = approve ? await approveGuest(guest) : await waitlistGuest(guest);
       await saveEvaluation(config, reg, ai, reasoning, webhookId, {
         status: approve ? "auto_approved" : "waitlisted",
         decided_by: "ai",
         decided_at: new Date().toISOString(),
+        luma_sync_mode: luma.mode,
       });
       await updateJob(job.jobId, { status: "completed", decision: approve ? "approve" : "waitlist" });
-      return NextResponse.json({ ok: true, route, score: ai?.score });
+      return NextResponse.json({ ok: true, route, score: ai?.score, lumaMode: luma.mode });
     }
 
     const evaluationId = await saveEvaluation(config, reg, ai, reasoning, webhookId, {
@@ -148,7 +147,7 @@ async function saveEvaluation(
   ai: AttendeeScore | null,
   reasoning: string,
   webhookId: string,
-  outcome: { status: EvaluationStatus; decided_by?: string; decided_at?: string },
+  outcome: { status: EvaluationStatus; decided_by?: string; decided_at?: string; luma_sync_mode?: LumaMode },
   existingId?: string,
 ): Promise<string> {
   const { data, error } = await supabaseAdmin()

@@ -39,6 +39,18 @@ export function verifyLumaSignature(rawBody: string, headers: Headers, secret: s
   return match ? { ok: true } : { ok: false, reason: "signature mismatch" };
 }
 
+/** Produces the headers Luma would send, so simulated deliveries pass the real verifier. */
+export function signLumaPayload(rawBody: string, secret: string, webhookId: string, nowMs = Date.now()): Headers {
+  const timestamp = String(Math.floor(nowMs / 1000));
+  const signature = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
+  return new Headers({
+    "content-type": "application/json",
+    "webhook-id": webhookId,
+    "webhook-timestamp": timestamp,
+    "webhook-signature": `t=${timestamp},v1=${signature}`,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Payload parsing (deliberately tolerant: Luma's guest payload shape is only partially
 // documented, so we accept the known variants and validate what we actually need).

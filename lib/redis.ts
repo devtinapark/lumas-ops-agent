@@ -172,3 +172,11 @@ export async function claimTelegramUpdate(updateId: number): Promise<boolean> {
   const res = await redis().set(k.tgUpdate(updateId), 1, { nx: true, ex: TTL.telegramUpdate });
   return res === "OK";
 }
+
+/** Fixed-window limiter. Returns false once `limit` hits within `windowSeconds`. */
+export async function hitRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+  const k2 = `${P}:ratelimit:${key}`;
+  const count = await redis().incr(k2);
+  if (count === 1) await redis().expire(k2, windowSeconds);
+  return count <= limit;
+}

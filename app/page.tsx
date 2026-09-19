@@ -10,6 +10,7 @@ const ENV_GROUPS: Record<string, string[][]> = {
   ],
   OpenAI: [["OPENAI_API_KEY"]],
   Telegram: [["TELEGRAM_BOT_TOKEN"], ["TELEGRAM_WEBHOOK_SECRET"]],
+  "Founder console": [["ADMIN_PASSWORD"], ["ADMIN_SESSION_SECRET"]],
 };
 
 const ENDPOINTS = [
@@ -26,9 +27,15 @@ export default function Home() {
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">LumaOps Agent</h1>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-          Guardrailed event ops for Visible Builders. Backend only for now: webhooks in, Telegram
-          decision cards out.
+          Guardrailed event ops for Visible Builders. Luma webhooks in, Telegram decision cards
+          out.
         </p>
+        <a
+          href="/admin"
+          className="mt-4 inline-flex rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+        >
+          Founder console →
+        </a>
       </header>
 
       {showStatus && (
