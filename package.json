@@ -11,7 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.71",
+    "@openrouter/ai-sdk-provider": "^3.1.0",
     "@supabase/supabase-js": "^2.116.0",
     "@upstash/redis": "^1.38.4",
     "ai": "^7.0.107",

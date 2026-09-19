@@ -2,11 +2,13 @@
 """LumaOps badge sheet + attendee distribution chart.
 
 Reads approved attendees from Supabase, writes a printable name-badge PDF (local only:
-it contains names) and uploads an aggregate role/skill chart PNG (no PII) to Vercel Blob.
+it contains names) and uploads an aggregate role/skill chart PNG (no PII) to Supabase Storage.
 
     pip install reportlab matplotlib requests
-    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... BLOB_READ_WRITE_TOKEN=... \
+    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
         python lib/badge-generator.py --event evt-XXXX --out ./out
+
+The upload needs a public Storage bucket (default "charts"; override with SUPABASE_CHARTS_BUCKET).
 
 Uses the service-role key: run it from the founder's machine or a locked-down CI/sandbox job,
 never from anything the local host can reach.
@@ -32,8 +34,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth  # noqa: E402
 from reportlab.pdfgen import canvas  # noqa: E402
 
 APPROVED = ("auto_approved", "host_approved")
-BLOB_API = "https://blob.vercel-storage.com"
-BLOB_API_VERSION = "10"  # reverse-engineered from community clients; pin and re-verify on upgrade
+CHARTS_BUCKET = os.environ.get("SUPABASE_CHARTS_BUCKET", "charts")
 
 # Chart palette (single-hue magnitude encoding; validated default light surface/ink).
 SURFACE, INK, INK_2, BAR = "#fcfcfb", "#0b0b0b", "#52514e", "#2a78d6"
@@ -207,32 +208,31 @@ def build_chart(path: Path, attendees: list[dict], event_name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Vercel Blob upload (aggregate chart only; the badge PDF holds names and stays local)
+# Supabase Storage upload (aggregate chart only; the badge PDF holds names and stays local)
 # ---------------------------------------------------------------------------
-def upload_to_blob(local: Path, pathname: str) -> str:
-    res = requests.put(
-        f"{BLOB_API}/",
-        params={"pathname": pathname},
+def upload_chart(local: Path, pathname: str) -> str:
+    base = env("SUPABASE_URL").rstrip("/")
+    res = requests.post(
+        f"{base}/storage/v1/object/{CHARTS_BUCKET}/{pathname}",
         data=local.read_bytes(),
         headers={
-            "authorization": f"Bearer {env('BLOB_READ_WRITE_TOKEN')}",
-            "x-api-version": BLOB_API_VERSION,
-            "x-content-type": "image/png",
-            "x-allow-overwrite": "1",  # stable URL per event
-            "x-cache-control-max-age": "60",
-            "access": "public",
+            "apikey": env("SUPABASE_SERVICE_ROLE_KEY"),
+            "authorization": f"Bearer {env('SUPABASE_SERVICE_ROLE_KEY')}",
+            "content-type": "image/png",
+            "cache-control": "max-age=60",
+            "x-upsert": "true",  # stable URL per event
         },
         timeout=60,
     )
     res.raise_for_status()
-    return res.json()["url"]
+    return f"{base}/storage/v1/object/public/{CHARTS_BUCKET}/{pathname}"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--event", required=True, help="Luma event id, e.g. evt-abc123")
     parser.add_argument("--out", default="./out", help="output directory for local files")
-    parser.add_argument("--no-upload", action="store_true", help="skip the Vercel Blob upload")
+    parser.add_argument("--no-upload", action="store_true", help="skip the Supabase Storage upload")
     args = parser.parse_args()
 
     attendees = fetch_approved(args.event)
@@ -250,7 +250,7 @@ def main() -> None:
     print(f"Chart:   {chart_path}")
 
     if not args.no_upload:
-        print(f"Blob:    {upload_to_blob(chart_path, f'charts/{args.event}-distribution.png')}")
+        print(f"Chart URL: {upload_chart(chart_path, f'{args.event}-distribution.png')}")
 
 
 if __name__ == "__main__":

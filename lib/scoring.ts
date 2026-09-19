@@ -1,5 +1,5 @@
 import { generateText, Output } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { openrouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import type { ParsedRegistration } from "@/lib/luma";
 
@@ -42,8 +42,10 @@ export async function scoreApplicant(reg: ParsedRegistration): Promise<AttendeeS
 
   try {
     const { output } = await generateText({
-      model: openai("gpt-4o-mini"),
+      // .chat() pins the OpenAI-compatible /chat/completions shape OpenRouter serves.
+      model: openrouter.chat("anthropic/claude-haiku-4.5"),
       temperature: 0,
+      maxOutputTokens: 1024,
       system: SYSTEM,
       prompt: `<applicant>\n${applicant}\n</applicant>`,
       output: Output.object({ schema: evaluationSchema }),

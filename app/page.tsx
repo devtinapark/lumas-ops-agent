@@ -8,7 +8,7 @@ const ENV_GROUPS: Record<string, string[][]> = {
     ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"],
     ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"],
   ],
-  OpenAI: [["OPENAI_API_KEY"]],
+  OpenRouter: [["OPENROUTER_API_KEY"]],
   Telegram: [["TELEGRAM_BOT_TOKEN"], ["TELEGRAM_WEBHOOK_SECRET"]],
   "Founder console": [["ADMIN_PASSWORD"], ["ADMIN_SESSION_SECRET"]],
 };

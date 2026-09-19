@@ -18,13 +18,22 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-/** Like requireEnv, but rejects a value that is not an http(s) URL — an API key
- *  pasted into a URL var otherwise fails deep inside the Supabase client. */
+/** Like requireEnv, but rejects a value that is not a usable http(s) URL — an API
+ *  key, or an unfilled `https://<project-ref>...` placeholder copied from
+ *  .env.example, otherwise fails deep inside the Supabase client. */
 export function requireUrlEnv(name: string): string {
   const value = requireEnv(name);
-  if (!/^https?:\/\//.test(value)) {
-    throw new Error(`${name} must be an http(s) URL, e.g. https://<project-ref>.supabase.co`);
+  const hint = `${name} must be an http(s) URL, e.g. https://abcdefghijkl.supabase.co`;
+  if (/[<>]/.test(value)) {
+    throw new Error(`${hint} — got the unfilled placeholder ${value}`);
   }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${hint} — got ${value}`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(hint);
   return value;
 }
 

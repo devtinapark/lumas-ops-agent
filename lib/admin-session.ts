@@ -34,6 +34,21 @@ export function verifySessionToken(token: string | undefined, secret: string | u
   return safeEqual(mac, sign(expires, secret));
 }
 
+/**
+ * Demo/judging escape hatch: while ADMIN_OPEN_UNTIL is an RFC-3339 timestamp in
+ * the future, /admin needs no password at all. It expires on its own, so the
+ * console re-locks without anyone remembering to revert a code change.
+ *
+ * This is full service-role access to every event and attendee. Only set it for
+ * a demo window, and unset it afterwards rather than waiting for the clock.
+ */
+export function openAccessUntil(raw: string | undefined, nowMs = Date.now()): number | null {
+  if (!raw) return null;
+  const until = Date.parse(raw.trim());
+  if (Number.isNaN(until) || until <= nowMs) return null;
+  return until;
+}
+
 /** Refuse to run with a guessable session secret. */
 export function sessionSecretProblem(secret: string | undefined): string | null {
   if (!secret) return "ADMIN_SESSION_SECRET is not set.";

@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const job = await createJob({ webhookId, lumaEventId: reg.lumaEventId, lumaGuestId: reg.lumaGuestId });
     await updateJob(job.jobId, { status: "scoring" });
 
-    // 3. Score with gpt-4o-mini. null means the model failed -> a human decides.
+    // 3. Score with Claude Haiku 4.5 via OpenRouter. null means the model failed -> a human decides.
     const ai = await scoreApplicant(reg);
     const { route, note } = await decideRoute(config, ai);
     const reasoning = [ai?.reasoning ?? "AI evaluation unavailable; needs human review.", note]

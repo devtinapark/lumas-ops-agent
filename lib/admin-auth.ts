@@ -1,9 +1,27 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_COOKIE, SESSION_TTL_SECONDS, createSessionToken, verifySessionToken } from "@/lib/admin-session";
+import {
+  ADMIN_COOKIE,
+  SESSION_TTL_SECONDS,
+  createSessionToken,
+  openAccessUntil,
+  verifySessionToken,
+} from "@/lib/admin-session";
+
+let warnedOpen = false;
 
 export async function isAdmin(): Promise<boolean> {
+  const openUntil = openAccessUntil(process.env.ADMIN_OPEN_UNTIL);
+  if (openUntil !== null) {
+    if (!warnedOpen) {
+      warnedOpen = true;
+      console.warn(
+        `[admin] ADMIN_OPEN_UNTIL is set: /admin is UNAUTHENTICATED until ${new Date(openUntil).toISOString()}.`,
+      );
+    }
+    return true;
+  }
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   return verifySessionToken(token, process.env.ADMIN_SESSION_SECRET);
 }
