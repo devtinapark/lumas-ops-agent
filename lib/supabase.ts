@@ -5,7 +5,7 @@ let client: SupabaseClient | undefined;
 /** Service-role client. Server-only: never import this from a Client Component. */
 export function supabaseAdmin(): SupabaseClient {
   client ??= createClient(
-    requireEnv("SUPABASE_URL"),
+    requireUrlEnv("SUPABASE_URL"),
     requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
@@ -15,6 +15,16 @@ export function supabaseAdmin(): SupabaseClient {
 export function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required env var ${name}`);
+  return value;
+}
+
+/** Like requireEnv, but rejects a value that is not an http(s) URL — an API key
+ *  pasted into a URL var otherwise fails deep inside the Supabase client. */
+export function requireUrlEnv(name: string): string {
+  const value = requireEnv(name);
+  if (!/^https?:\/\//.test(value)) {
+    throw new Error(`${name} must be an http(s) URL, e.g. https://<project-ref>.supabase.co`);
+  }
   return value;
 }
 
