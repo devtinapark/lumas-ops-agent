@@ -2,8 +2,10 @@ import { z } from "zod";
 
 const blankToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 
+// Telegram ids are numeric and permanent; @handles are reassignable, so authorisation
+// in the callback route matches on `from.id` only.
 const telegramId = z.coerce
-  .number({ message: "Must be a number" })
+  .number({ message: "Must be the numeric id, not an @handle" })
   .int("Must be a whole number")
   .refine((n) => n !== 0 && Math.abs(n) <= Number.MAX_SAFE_INTEGER, "Not a valid Telegram id");
 

@@ -31,7 +31,7 @@ export function EventForm({ event }: { event?: EventConfig }) {
   const values = state.values ?? initialValues(event);
   const errors = state.errors ?? {};
 
-  const field = (name: string, label: string, opts: { type?: string; hint?: string; placeholder?: string; required?: boolean; min?: number; max?: number; step?: string } = {}) => (
+  const field = (name: string, label: string, opts: { type?: string; hint?: string; placeholder?: string; required?: boolean; min?: number; max?: number; step?: string; inputMode?: "numeric" | "text"; pattern?: string } = {}) => (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={name} className="text-sm font-medium">
         {label}
@@ -46,6 +46,8 @@ export function EventForm({ event }: { event?: EventConfig }) {
         min={opts.min}
         max={opts.max}
         step={opts.step}
+        inputMode={opts.inputMode}
+        pattern={opts.pattern}
         aria-invalid={errors[name] ? true : undefined}
         aria-describedby={`${name}-hint`}
         className={inputClass}
@@ -97,10 +99,10 @@ export function EventForm({ event }: { event?: EventConfig }) {
         <legend className="px-1 text-sm font-semibold">People (Telegram)</legend>
         {field("local_host_name", "Local host name", { required: true })}
         <div className="hidden sm:block" />
-        {field("local_host_telegram_id", "Host Telegram user id", { type: "number", required: true, hint: "Only this user can press Approve/Waitlist/Escalate." })}
-        {field("local_host_chat_id", "Host chat id (optional)", { type: "number", hint: "Blank = DM the host. Use a group id (negative) for a group." })}
-        {field("founder_telegram_id", "Founder Telegram user id", { type: "number", required: true, hint: "Receives escalations; can always decide." })}
-        {field("founder_chat_id", "Founder chat id (optional)", { type: "number", hint: "Blank = DM the founder." })}
+        {field("local_host_telegram_id", "Host Telegram user id", { inputMode: "numeric", pattern: "[0-9]+", required: true, hint: "Numeric id, not @handle — get it from @userinfobot. Only this user can press Approve/Waitlist/Escalate." })}
+        {field("local_host_chat_id", "Host chat id (optional)", { inputMode: "text", pattern: "-?[0-9]+", hint: "Blank = DM the host. Use a group id (negative) for a group." })}
+        {field("founder_telegram_id", "Founder Telegram user id", { inputMode: "numeric", pattern: "[0-9]+", required: true, hint: "Numeric id, not @handle. Receives escalations; can always decide." })}
+        {field("founder_chat_id", "Founder chat id (optional)", { inputMode: "text", pattern: "-?[0-9]+", hint: "Blank = DM the founder." })}
       </fieldset>
 
       <div className="flex justify-end">
