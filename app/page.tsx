@@ -1,69 +1,77 @@
-import Image from "next/image";
+// Read env at request time, not at build time.
+export const dynamic = "force-dynamic";
+
+const ENV_GROUPS: Record<string, string[][]> = {
+  Luma: [["LUMA_API_KEY"], ["LUMA_WEBHOOK_SECRET"]],
+  Supabase: [["SUPABASE_URL"], ["SUPABASE_SERVICE_ROLE_KEY"]],
+  "Upstash Redis": [
+    ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"],
+    ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"],
+  ],
+  OpenAI: [["OPENAI_API_KEY"]],
+  Telegram: [["TELEGRAM_BOT_TOKEN"], ["TELEGRAM_WEBHOOK_SECRET"]],
+};
+
+const ENDPOINTS = [
+  { path: "/api/webhooks/luma", note: "Luma guest.registered webhook (signed)" },
+  { path: "/api/telegram/action", note: "Telegram button callbacks (secret-token checked)" },
+];
 
 export default function Home() {
+  // Config status is dev-only so a public deploy never reveals what is configured.
+  const showStatus = process.env.NODE_ENV !== "production";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-16 font-sans">
+      <header>
+        <h1 className="text-3xl font-semibold tracking-tight">LumaOps Agent</h1>
+        <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+          Guardrailed event ops for Visible Builders. Backend only for now: webhooks in, Telegram
+          decision cards out.
+        </p>
+      </header>
+
+      {showStatus && (
+        <>
+          <section>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              Environment (dev only)
+            </h2>
+            <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+              {Object.entries(ENV_GROUPS).flatMap(([group, vars]) =>
+                vars.map((names) => {
+                  const isSet = names.some((n) => Boolean(process.env[n]));
+                  return (
+                    <li key={names[0]} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                      <span>
+                        <span className="text-zinc-500">{group} · </span>
+                        <code className="font-mono">{names[0]}</code>
+                      </span>
+                      <span className={isSet ? "text-emerald-600" : "text-red-600"}>
+                        {isSet ? "✓ set" : "✗ missing"}
+                      </span>
+                    </li>
+                  );
+                }),
+              )}
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              Endpoints (POST)
+            </h2>
+            <ul className="space-y-2 text-sm">
+              {ENDPOINTS.map((e) => (
+                <li key={e.path}>
+                  <code className="font-mono">{e.path}</code>
+                  <span className="text-zinc-500"> — {e.note}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+    </main>
   );
 }

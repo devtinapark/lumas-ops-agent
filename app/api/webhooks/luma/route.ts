@@ -4,12 +4,11 @@ import { parseGuestRegistered, updateGuestStatus, verifyLumaSignature, type Pars
 import { scoreApplicant, type AttendeeScore } from "@/lib/scoring";
 import { claimWebhook, createJob, pauseForHost, releaseWebhook, updateJob, updatePending } from "@/lib/redis";
 import { sendApprovalCard } from "@/lib/telegram";
+import { routeApplicant } from "@/lib/routing";
 
 export const runtime = "nodejs";
 // Scoring + Luma + Telegram calls run inline so a failure returns non-2xx and Luma retries.
 export const maxDuration = 60;
-
-type Route = "auto_approve" | "auto_waitlist" | "host_review";
 
 export async function POST(request: Request) {
   // 1. Verify the signature over the *raw* body before trusting anything in it.
@@ -131,33 +130,16 @@ export async function POST(request: Request) {
   }
 }
 
-async function decideRoute(
-  config: EventConfig,
-  ai: AttendeeScore | null,
-): Promise<{ route: Route; note?: string }> {
-  if (!ai) return { route: "host_review" };
-  if (ai.score < config.auto_waitlist_threshold) return { route: "auto_waitlist" };
-  if (ai.score < config.auto_approve_threshold) return { route: "host_review" };
-
-  // Score qualifies for auto-approval; the guardrails below can still hand it to a human.
-  if (ai.injection_suspected) {
-    return { route: "host_review", note: "Auto-approval blocked: possible prompt injection." };
-  }
-  const { count } = await supabaseAdmin()
+async function decideRoute(config: EventConfig, ai: AttendeeScore | null) {
+  // Only count approvals when the score could actually auto-approve.
+  if (!ai || ai.score < config.auto_approve_threshold) return routeApplicant(config, ai, 0);
+  const { count, error } = await supabaseAdmin()
     .from("attendee_evaluations")
     .select("id", { count: "exact", head: true })
     .eq("event_config_id", config.id)
     .in("status", ["auto_approved", "host_approved"]);
-  const approved = count ?? 0;
-  const overCapacity = config.venue_capacity != null && approved >= config.venue_capacity;
-  const overBudget =
-    config.budget_cap_cents > 0 &&
-    config.cost_per_head_cents > 0 &&
-    (approved + 1) * config.cost_per_head_cents > config.budget_cap_cents;
-  if (overCapacity || overBudget) {
-    return { route: "host_review", note: "Auto-approval paused: venue capacity/budget cap reached." };
-  }
-  return { route: "auto_approve" };
+  if (error) throw new Error(`approved count failed: ${error.message}`);
+  return routeApplicant(config, ai, count ?? 0);
 }
 
 async function saveEvaluation(
